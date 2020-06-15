@@ -37,7 +37,7 @@ for i in liste:
     if i[-1] == '/':
         liste.remove(i)
 
-cmd = ['dmenu', '-fn', 'Hack', '-nb', '#000000', '-l', '5' '-i',
+cmd = ['dmenu', '-fn', 'Hack', '-nb', '#000000', '-l', '5', '-i',
        '-p', 'Type in password']
 proc = subprocess.Popen(cmd, universal_newlines=True, stdin=subprocess.PIPE,
                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
