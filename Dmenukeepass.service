@@ -1,0 +1,12 @@
+[Unit]
+Description=Dmenu Keepass Service
+ 
+[Service]
+Type=simple
+ExecStart=/path/to/dmenukeepass_daemon
+User=<username>
+Group=<group>
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,158 @@
+#! /usr/bin/python3
+
+import sys
+import pexpect
+import subprocess
+import re
+import dbus
+import notify2
+import os
+from threading import Thread
+from gi.repository import GLib
+from dbus.mainloop.glib import DBusGMainLoop
+from time import sleep
+
+
+path = "/path/to/keepass.kdbx"
+
+
+def run():
+    if ("mdp" not in globals()):
+        if not unlock():
+            return
+    Thread(target=retrive_pwd).start()
+
+
+def retrive_pwd():
+    a = pexpect.spawn(f"keepassxc-cli open {path}")
+    a.expect(".*: ")
+
+    a.sendline(mdp)
+    a.expect(b".*> ")
+
+    a.sendline("ls -Rf")
+    a.expect(b".*> ")
+    liste = a.after.decode().split("\n")[1:-1]
+
+    fin_liste = []
+
+    for i in liste:
+        if i[-2] != '/':
+            fin_liste.append(i[:-1])
+
+    fin_liste1 = sorted(fin_liste, key=lambda i: i.lower())
+
+    cmd = ['dmenu', '-fn', 'Hack', '-nb', '#000000', '-l', '5', '-i',
+           '-p', 'Type in password']
+    proc = subprocess.Popen(cmd, universal_newlines=True,
+                            stdin=subprocess.PIPE,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    with proc.stdin:
+        for i in fin_liste1:
+            proc.stdin.write(i)
+            proc.stdin.write('\n')
+    if proc.wait() == 0:
+        pwd = proc.stdout.read().rstrip('\n')
+    else:
+        return
+
+    if pwd not in fin_liste1:
+        n = notify2.Notification(None)
+        n.update("Dmenu Keepass", "Password doesn\'t exist")
+        n.show()
+        return
+
+    a.sendline('clip "{}"'.format(pwd))
+    a.expect(".*> ")
+    sleep(10)
+    a.close()
+    return
+
+
+def unlock():
+    global mdp
+    a = pexpect.spawn(f"keepassxc-cli open {path}")
+    a.expect(".*: ")
+
+    cmd = ['dmenu', '-fn', 'Hack', '-nb', '#000000', '-sb', '#d79921', '-sf',
+           '#1d2021', '-nf', '#000000', '-p', 'Type in keepass passphrase']
+    proc = subprocess.Popen(cmd, universal_newlines=True,
+                            stdin=subprocess.PIPE,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    with proc.stdin:
+        proc.stdin.write('')
+    if proc.wait() == 0:
+        mdp = proc.stdout.read().rstrip('\n')
+    else:
+        return False
+
+    a.sendline(mdp)
+    a.expect(".*> ")
+    rep = a.after.decode()
+    a.close()
+    if re.search(r"\n\x1b\[6 q.+> ", rep) is None:
+        p('Connexion failed')
+        del(mdp)
+        n = notify2.Notification(None)
+        n.update("Dmenu Keepass", "Wrong passphrase")
+        n.show()
+        return False
+    p('Connexion successful')
+    return True
+
+
+def close_db(*args):
+    global mdp
+    if args[0]:
+        if ("mdp" in globals()):
+            del(mdp)
+            p('Flush password')
+    return
+
+
+def catch_sleep():
+    DBusGMainLoop(set_as_default=True)      # integrate into main loob
+    bus = dbus.SystemBus()                  # connect to dbus system wide
+    bus.add_signal_receiver(                # defince the signal to listen to
+        close_db,                           # name of callback function
+        'PrepareForSleep',                  # singal name
+        'org.freedesktop.login1.Manager',   # interface
+        'org.freedesktop.login1'            # bus name
+    )
+
+    loop = GLib.MainLoop()                  # define mainloop
+    loop.run()                              # run main loop
+
+
+def serv_listner():
+    while True:
+        if os.path.isfile('/tmp/dmenukeepass_open'):
+            try:
+                os.remove('/tmp/dmenukeepass_open')
+            except Exception:
+                pass
+            p('Try open')
+            run()
+        elif os.path.isfile('/tmp/dmenukeepass_close'):
+            try:
+                os.remove('/tmp/dmenukeepass_close')
+            except Exception:
+                pass
+            p('Try close')
+            close_db(1)
+
+
+def p(*args, **kwargs):
+    print(*args, **kwargs)
+    sys.stdout.flush()
+
+
+if __name__ == "__main__":
+    if 'DISPLAY' not in os.environ:
+        os.environ['DISPLAY'] = ':0'
+    os.environ['DBUS_SESSION_BUS_ADDRESS'] = re.findall(
+        r"DBUS_SESSION_BUS_ADDRESS=(.+)\n",
+        subprocess.check_output('dbus-launch').decode())[0]
+    notify2.init("DmenuKeepass")
+    Thread(target=catch_sleep).start()
+    serv_listner()
