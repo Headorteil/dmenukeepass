@@ -154,6 +154,11 @@ if __name__ == "__main__":
     os.environ['DBUS_SESSION_BUS_ADDRESS'] = re.findall(
         r"DBUS_SESSION_BUS_ADDRESS=(.+)\n",
         subprocess.check_output('dbus-launch').decode())[0]
-    notify2.init("DmenuKeepass")
+    while True:
+        try:
+            notify2.init("DmenuKeepass")
+            break
+        except dbus.exceptions.DBusException:
+            sleep(1)
     Thread(target=catch_sleep).start()
     serv_listner()
