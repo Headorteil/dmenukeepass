@@ -140,6 +140,7 @@ def serv_listner():
                 pass
             p('Try close')
             close_db(1)
+        sleep(0.5)
 
 
 def p(*args, **kwargs):
