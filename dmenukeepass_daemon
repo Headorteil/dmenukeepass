@@ -1,14 +1,14 @@
 #! /usr/bin/python3
 
 import sys
-import pexpect
 import subprocess
 import re
 import dbus
 import notify2
 import os
+from pykeepass import PyKeePass, exceptions
 from threading import Thread
-from gi.repository import GLib
+from gi.repository.GLib import MainLoop
 from dbus.mainloop.glib import DBusGMainLoop
 from time import sleep
 
@@ -24,21 +24,10 @@ def run():
 
 
 def retrive_pwd():
-    a = pexpect.spawn(f"keepassxc-cli open {path}")
-    a.expect(".*: ")
-
-    a.sendline(mdp)
-    a.expect(b".*> ")
-
-    a.sendline("ls -Rf")
-    a.expect(b".*> ")
-    liste = a.after.decode().split("\n")[1:-1]
-
-    fin_liste = []
-
-    for i in liste:
-        if i[-2] != '/':
-            fin_liste.append(i[:-1])
+    kp = PyKeePass(path, password=mdp)
+    liste = kp.entries
+    fin_liste = [i.group.name + "/" + i.title + " : " + str(i.username)
+                 for i in liste]
 
     fin_liste1 = sorted(fin_liste, key=lambda i: i.lower())
 
@@ -62,17 +51,21 @@ def retrive_pwd():
         n.show()
         return
 
-    a.sendline('clip "{}"'.format(pwd))
-    a.expect(".*> ")
+    entry = liste[fin_liste.index(pwd)]
+
+    p = subprocess.Popen(['xclip', '-selection', 'c'], stdin=subprocess.PIPE,
+                         close_fds=True)
+    p.communicate(input=entry.password.encode('UTF-8'))
     sleep(10)
-    a.close()
+    p = subprocess.Popen(['xclip', '-selection', 'c'], stdin=subprocess.PIPE,
+                         close_fds=True)
+    p.communicate(input="")
+    del(kp)
     return
 
 
 def unlock():
     global mdp
-    a = pexpect.spawn(f"keepassxc-cli open {path}")
-    a.expect(".*: ")
 
     cmd = ['dmenu', '-fn', 'Hack', '-nb', '#000000', '-sb', '#d79921', '-sf',
            '#1d2021', '-nf', '#000000', '-p', 'Type in keepass passphrase']
@@ -86,17 +79,16 @@ def unlock():
     else:
         return False
 
-    a.sendline(mdp)
-    a.expect(".*> ")
-    rep = a.after.decode()
-    a.close()
-    if re.search(r"\n\x1b\[6 q.+> ", rep) is None:
+    try:
+        kp = PyKeePass(path, password=mdp)
+    except exceptions.CredentialsError:
         p('Connexion failed')
         del(mdp)
         n = notify2.Notification(None)
         n.update("Dmenu Keepass", "Wrong passphrase")
         n.show()
         return False
+    del(kp)
     p('Connexion successful')
     return True
 
@@ -120,7 +112,7 @@ def catch_sleep():
         'org.freedesktop.login1'            # bus name
     )
 
-    loop = GLib.MainLoop()                  # define mainloop
+    loop = MainLoop()                       # define mainloop
     loop.run()                              # run main loop
 
 
