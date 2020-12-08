@@ -17,14 +17,13 @@ path = "/path/to/keepass.kdbx"
 
 
 def run():
-    if ("mdp" not in globals()):
+    if ("kp" not in globals()):
         if not unlock():
             return
     Thread(target=retrive_pwd).start()
 
 
 def retrive_pwd():
-    kp = PyKeePass(path, password=mdp)
     liste = kp.entries
     fin_liste = [i.group.name + "/" + i.title + " : " + str(i.username)
                  for i in liste]
@@ -60,12 +59,11 @@ def retrive_pwd():
     p = subprocess.Popen(['xclip', '-selection', 'c'], stdin=subprocess.PIPE,
                          close_fds=True)
     p.communicate(input="")
-    del(kp)
     return
 
 
 def unlock():
-    global mdp
+    global kp
 
     cmd = ['dmenu', '-fn', 'Hack', '-nb', '#000000', '-sb', '#d79921', '-sf',
            '#1d2021', '-nf', '#000000', '-p', 'Type in keepass passphrase']
@@ -83,21 +81,19 @@ def unlock():
         kp = PyKeePass(path, password=mdp)
     except exceptions.CredentialsError:
         p('Connexion failed')
-        del(mdp)
         n = notify2.Notification(None)
         n.update("Dmenu Keepass", "Wrong passphrase")
         n.show()
         return False
-    del(kp)
     p('Connexion successful')
     return True
 
 
 def close_db(*args):
-    global mdp
+    global kp
     if args[0]:
-        if ("mdp" in globals()):
-            del(mdp)
+        if ("kp" in globals()):
+            del(kp)
             p('Flush password')
     return
 
