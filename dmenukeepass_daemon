@@ -1,11 +1,11 @@
 #! /usr/bin/python3
 
-import sys
 import subprocess
 import re
 import dbus
 import notify2
 import os
+from datetime import datetime
 from pykeepass import PyKeePass, exceptions
 from threading import Thread
 from gi.repository.GLib import MainLoop
@@ -14,6 +14,7 @@ from time import sleep
 
 
 path = "/path/to/keepass.kdbx"
+log = "/path/to/log/file"
 
 
 def run():
@@ -131,22 +132,19 @@ def serv_listner():
         sleep(0.5)
 
 
-def p(*args, **kwargs):
-    print(*args, **kwargs)
-    sys.stdout.flush()
+def p(content):
+    with open(log, "a") as f:
+        f.write(str(datetime.today()) + " " + content + '\n')
 
 
 if __name__ == "__main__":
+    with open(log, "w") as f:
+        f.write('')
     if 'DISPLAY' not in os.environ:
         os.environ['DISPLAY'] = ':0'
     os.environ['DBUS_SESSION_BUS_ADDRESS'] = re.findall(
         r"DBUS_SESSION_BUS_ADDRESS=(.+)\n",
         subprocess.check_output('dbus-launch').decode())[0]
-    while True:
-        try:
-            notify2.init("DmenuKeepass")
-            break
-        except dbus.exceptions.DBusException:
-            sleep(1)
+    notify2.init("DmenuKeepass")
     Thread(target=catch_sleep).start()
     serv_listner()
