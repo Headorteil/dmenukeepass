@@ -1,7 +1,6 @@
 #! /usr/bin/python3
 
 import subprocess
-import re
 import dbus
 import notify2
 import os
@@ -15,6 +14,7 @@ from time import sleep
 
 path = "/path/to/keepass.kdbx"
 log = "/path/to/log/file"
+user = "username"
 
 
 def run():
@@ -142,9 +142,8 @@ if __name__ == "__main__":
         f.write('')
     if 'DISPLAY' not in os.environ:
         os.environ['DISPLAY'] = ':0'
-    os.environ['DBUS_SESSION_BUS_ADDRESS'] = re.findall(
-        r"DBUS_SESSION_BUS_ADDRESS=(.+)\n",
-        subprocess.check_output('dbus-launch').decode())[0]
+    uid = subprocess.check_output(['id', '-u', user]).decode().strip()
+    os.environ['DBUS_SESSION_BUS_ADDRESS'] = f"unix:path=/run/user/{uid}/bus"
     notify2.init("DmenuKeepass")
     Thread(target=catch_sleep).start()
     serv_listner()
