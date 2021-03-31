@@ -9,7 +9,7 @@ cffi==1.14.4              # via argon2-cffi
 construct==2.10.54        # via pykeepass
 datetime==4.3             # via -r requirements.in
 future==0.18.2            # via pykeepass
-lxml==4.6.2               # via pykeepass
+lxml==4.6.3               # via pykeepass
 notify2==0.3.1            # via -r requirements.in
 pycparser==2.20           # via cffi
 pycryptodomex==3.9.9      # via pykeepass
