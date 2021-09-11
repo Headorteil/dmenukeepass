@@ -17,5 +17,3 @@ Run dmenukeepass_daemon after the running of the x11 server while pasting
 in your .profile after startx for example.
 
 Bind keepass_close and keepass_open scripts to shortcuts or put them in in /usr/bin.
-
-Then, you just need to change the path of the keepass.kdbx and of the log file in dmenukeepass_daemon and it should work.
