@@ -1,3 +1,8 @@
-#! /bin/bash
+#! /usr/bin/env python3
 
-touch /tmp/dmenukeepass_open
+import socket
+
+client = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+client.connect('/tmp/DmenuKeepass')
+client.send(b'open')
+client.close()

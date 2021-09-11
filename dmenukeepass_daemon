@@ -1,10 +1,13 @@
-#! /usr/bin/python3
+#! /usr/bin/env python3
 
 import subprocess
 import dbus
 import notify2
 import os
-from datetime import datetime
+import socket
+import argparse
+import logging
+from logging.handlers import RotatingFileHandler
 from pykeepass import PyKeePass, exceptions
 from threading import Thread
 from gi.repository.GLib import MainLoop
@@ -12,26 +15,27 @@ from dbus.mainloop.glib import DBusGMainLoop
 from time import sleep
 
 
-path = "/path/to/keepass.kdbx"
-log = "/path/to/log/file"
-user = "username"
+class Keepass:
+    def __init__(self, db_path):
+        self.content = None
+        self.db_path = db_path
 
 
 def run():
-    if ("kp" not in globals()):
+    if not keepass.content:
         if not unlock():
             return
     Thread(target=retrive_pwd).start()
 
 
 def retrive_pwd():
-    liste = kp.entries
+    liste = keepass.content.entries
     fin_liste = [i.group.name + "/" + i.title + " : " + str(i.username)
                  for i in liste]
 
     fin_liste1 = sorted(fin_liste, key=lambda i: i.lower())
 
-    cmd = ['dmenu', '-fn', 'Hack', '-nb', '#000000', '-l', '5', '-i',
+    cmd = ['dmenu', '-fn', font, '-nb', '#000000', '-l', '5', '-i',
            '-p', 'Type in password']
     proc = subprocess.Popen(cmd, universal_newlines=True,
                             stdin=subprocess.PIPE,
@@ -40,62 +44,63 @@ def retrive_pwd():
         for i in fin_liste1:
             proc.stdin.write(i)
             proc.stdin.write('\n')
-    if proc.wait() == 0:
+    if not proc.wait():
         pwd = proc.stdout.read().rstrip('\n')
     else:
+        logger.error('Error with dmenu')
         return
 
     if pwd not in fin_liste1:
-        n = notify2.Notification(None)
-        n.update("Dmenu Keepass", "Password doesn\'t exist")
-        n.show()
+        notify2.Notification("Dmenu Keepass", "Password doesn't exist").show()
+        logger.warning('Wrong entry')
         return
 
     entry = liste[fin_liste.index(pwd)]
 
-    p = subprocess.Popen(['xclip', '-selection', 'c'], stdin=subprocess.PIPE,
-                         close_fds=True)
-    p.communicate(input=entry.password.encode('UTF-8'))
+    subprocess.Popen(['xclip', '-selection', 'c'], stdin=subprocess.PIPE,
+                     close_fds=True).communicate(input=entry.password.
+                                                 encode('UTF-8'))
+    logger.info('Password copied')
     sleep(10)
-    p = subprocess.Popen(['xclip', '-selection', 'c'], stdin=subprocess.PIPE,
-                         close_fds=True)
-    p.communicate(input="")
+    subprocess.Popen(['xclip', '-selection', 'c'], stdin=subprocess.PIPE,
+                     close_fds=True).communicate(input="")
+    logger.info('Password flushed')
     return
 
 
 def unlock():
-    global kp
-
-    cmd = ['dmenu', '-fn', 'Hack', '-nb', '#000000', '-sb', '#d79921', '-sf',
+    cmd = ['dmenu', '-fn', font, '-nb', '#000000', '-sb', '#d79921', '-sf',
            '#1d2021', '-nf', '#000000', '-p', 'Type in keepass passphrase']
     proc = subprocess.Popen(cmd, universal_newlines=True,
                             stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     with proc.stdin:
         proc.stdin.write('')
-    if proc.wait() == 0:
+    if not proc.wait():
         mdp = proc.stdout.read().rstrip('\n')
     else:
+        logger.error('Error with dmenu')
         return False
 
     try:
-        kp = PyKeePass(path, password=mdp)
+        keepass.content = PyKeePass(keepass.db_path, password=mdp)
     except exceptions.CredentialsError:
-        p('Connexion failed')
-        n = notify2.Notification(None)
-        n.update("Dmenu Keepass", "Wrong passphrase")
-        n.show()
+        logger.warning('Wrong credentials')
+        notify2.Notification("Dmenu Keepass", "Wrong passphrase").show()
         return False
-    p('Connexion successful')
+    logger.info('Connexion successful')
     return True
 
 
 def close_db(*args):
-    global kp
-    if args[0]:
-        if ("kp" in globals()):
-            del(kp)
-            p('Flush password')
+    if keepass.content:
+        if not args:
+            keepass.content = None
+            logger.info('Flush password')
+            notify2.Notification("Dmenu Keepass", "Password flushed").show()
+        elif args[0]:
+            keepass.content = None
+            logger.info('Flush password')
     return
 
 
@@ -108,42 +113,58 @@ def catch_sleep():
         'org.freedesktop.login1.Manager',   # interface
         'org.freedesktop.login1'            # bus name
     )
-
     loop = MainLoop()                       # define mainloop
     loop.run()                              # run main loop
 
 
 def serv_listner():
+    if os.path.exists(sock_path):
+        os.remove(sock_path)
+    server = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+    server.bind(sock_path)
+    logger.info(f'Listening on {sock_path}')
     while True:
-        if os.path.isfile('/tmp/dmenukeepass_open'):
-            try:
-                os.remove('/tmp/dmenukeepass_open')
-            except Exception:
-                pass
-            p('Try open')
+        dg = server.recv(10)
+        if dg == b'open':
+            logger.info('Try open')
             run()
-        elif os.path.isfile('/tmp/dmenukeepass_close'):
-            try:
-                os.remove('/tmp/dmenukeepass_close')
-            except Exception:
-                pass
-            p('Try close')
-            close_db(1)
-        sleep(0.5)
-
-
-def p(content):
-    with open(log, "a") as f:
-        f.write(str(datetime.today()) + " " + content + '\n')
+        elif dg == b'close':
+            logger.info('Try close')
+            close_db()
 
 
 if __name__ == "__main__":
-    with open(log, "w") as f:
-        f.write('')
+    sock_path = "/tmp/DmenuKeepass"
+    parser = argparse.ArgumentParser(description='Dmenukeepass Deamon')
+    parser.add_argument('--log', dest='log_path', help='Log file')
+    parser.add_argument('--font', dest='font', default='Hack',
+                        help='Dmenu font')
+    parser.add_argument('db_path', help='Database file', metavar='db-file')
+    args = parser.parse_args()
+    font = args.font
+
+    logger = logging.getLogger('Dmenu Keepass')
+    formatter = logging.Formatter("%(asctime)s -- %(name)s -- %(levelname)s --"
+                                  " %(message)s")
+    if args.log_path is not None:
+        handler = logging.handlers.RotatingFileHandler(args.log_path, mode="a",
+                                                       maxBytes=1000,
+                                                       backupCount=1,
+                                                       encoding="utf-8")
+    else:
+        handler = logging.StreamHandler()
+    handler.setFormatter(formatter)
+    logger.setLevel(logging.INFO)
+    logger.addHandler(handler)
+
     if 'DISPLAY' not in os.environ:
         os.environ['DISPLAY'] = ':0'
-    uid = subprocess.check_output(['id', '-u', user]).decode().strip()
+    uid = subprocess.check_output(['id', '-u']).decode().strip()
     os.environ['DBUS_SESSION_BUS_ADDRESS'] = f"unix:path=/run/user/{uid}/bus"
+    os.environ['XDG_RUNTIME_DIR'] = f"/run/user/{uid}/bus"
     notify2.init("DmenuKeepass")
+
+    keepass = Keepass(args.db_path)
+
     Thread(target=catch_sleep).start()
     serv_listner()
