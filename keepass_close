@@ -3,6 +3,6 @@
 import socket
 
 client = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-client.connect('/tmp/DmenuKeepass')
+client.connect('/tmp/DmenuKeepass.sock')
 client.send(b'close')
 client.close()

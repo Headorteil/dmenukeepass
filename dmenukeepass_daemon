@@ -134,7 +134,7 @@ def serv_listner():
 
 
 if __name__ == "__main__":
-    sock_path = "/tmp/DmenuKeepass"
+    sock_path = "/tmp/DmenuKeepass.sock"
     parser = argparse.ArgumentParser(description='Dmenukeepass Deamon')
     parser.add_argument('--log', dest='log_path', help='Log file')
     parser.add_argument('--font', dest='font', default='Hack',
