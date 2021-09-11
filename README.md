@@ -12,7 +12,7 @@ Install python requirements.
 
 Run dmenukeepass_daemon after the running of the x11 server while pasting
 
-`/path/to/dmenukeepass_daemon & > /path/to/dmenukeepass.log 1>&2`
+`/path/to/dmenukeepass_daemon /path/to/database.kdbx &`
 
 in your .profile after startx for example.
 
