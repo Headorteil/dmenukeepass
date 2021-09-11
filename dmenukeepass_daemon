@@ -12,13 +12,14 @@ from pykeepass import PyKeePass, exceptions
 from threading import Thread
 from gi.repository.GLib import MainLoop
 from dbus.mainloop.glib import DBusGMainLoop
-from time import sleep
+from time import sleep, time
 
 
 class Keepass:
     def __init__(self, db_path):
         self.content = None
         self.db_path = db_path
+        self.last_open = None
 
 
 def run():
@@ -60,11 +61,13 @@ def retrive_pwd():
     subprocess.Popen(['xclip', '-selection', 'c'], stdin=subprocess.PIPE,
                      close_fds=True).communicate(input=entry.password.
                                                  encode('UTF-8'))
+    keepass.last_open = time()
     logger.info('Password copied')
-    sleep(10)
-    subprocess.Popen(['xclip', '-selection', 'c'], stdin=subprocess.PIPE,
-                     close_fds=True).communicate(input="")
-    logger.info('Password flushed')
+    sleep(clip_time)
+    if time() - keepass.last_open > clip_time:
+        subprocess.Popen(['xclip', '-selection', 'c'], stdin=subprocess.PIPE,
+                         close_fds=True).communicate(input="")
+        logger.info('Password flushed')
     return
 
 
@@ -134,19 +137,26 @@ def serv_listner():
 
 
 if __name__ == "__main__":
-    sock_path = "/tmp/DmenuKeepass.sock"
+    sock_path = "/tmp/DmenuKeepass"
     parser = argparse.ArgumentParser(description='Dmenukeepass Deamon')
     parser.add_argument('--log', dest='log_path', help='Log file')
+    parser.add_argument('--dont-close', dest='auto_close',
+                        action='store_const', const=False, default=True,
+                        help="When enabled, database don't lock when system"
+                        "sleep")
     parser.add_argument('--font', dest='font', default='Hack',
                         help='Dmenu font')
+    parser.add_argument('--clip-time', dest='clip_time', default=10,
+                        type=int, help='Time password stays in clipboard')
     parser.add_argument('db_path', help='Database file', metavar='db-file')
     args = parser.parse_args()
     font = args.font
+    clip_time = args.clip_time
 
     logger = logging.getLogger('Dmenu Keepass')
     formatter = logging.Formatter("%(asctime)s -- %(name)s -- %(levelname)s --"
                                   " %(message)s")
-    if args.log_path is not None:
+    if args.log_path:
         handler = logging.handlers.RotatingFileHandler(args.log_path, mode="a",
                                                        maxBytes=1000,
                                                        backupCount=1,
@@ -166,5 +176,6 @@ if __name__ == "__main__":
 
     keepass = Keepass(args.db_path)
 
-    Thread(target=catch_sleep).start()
+    if args.auto_close:
+        Thread(target=catch_sleep).start()
     serv_listner()
