@@ -13,7 +13,7 @@ from threading import Thread
 from gi.repository.GLib import MainLoop
 from dbus.mainloop.glib import DBusGMainLoop
 from time import sleep, time
-
+from pathlib import Path
 
 class Keepass:
     def __init__(self, db_path):
@@ -57,7 +57,10 @@ def retreive_pwd():
         return
 
     entry = liste[fin_liste.index(pwd)]
+    
+    lock_path = "/tmp/clipman.lock"
 
+    Path(lock_path).touch()
     subprocess.Popen(['xclip', '-selection', 'c'], stdin=subprocess.PIPE,
                      close_fds=True).communicate(input=entry.password.
                                                  encode('UTF-8'))
@@ -67,6 +70,7 @@ def retreive_pwd():
     if time() - keepass.last_open > clip_time:
         subprocess.Popen(['xclip', '-selection', 'c'], stdin=subprocess.PIPE,
                          close_fds=True).communicate(input="")
+        Path(lock_path).unlink()
         logger.info('Password flushed')
     return
 
