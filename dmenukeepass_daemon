@@ -26,10 +26,10 @@ def run():
     if not keepass.content:
         if not unlock():
             return
-    Thread(target=retrive_pwd).start()
+    Thread(target=retreive_pwd).start()
 
 
-def retrive_pwd():
+def retreive_pwd():
     liste = keepass.content.entries
     fin_liste = [i.group.name + "/" + i.title + " : " + str(i.username)
                  for i in liste]
@@ -137,7 +137,7 @@ def serv_listner():
 
 
 if __name__ == "__main__":
-    sock_path = "/tmp/DmenuKeepass"
+    sock_path = "/tmp/DmenuKeepass.sock"
     parser = argparse.ArgumentParser(description='Dmenukeepass Deamon')
     parser.add_argument('--log', dest='log_path', help='Log file')
     parser.add_argument('--dont-close', dest='auto_close',
