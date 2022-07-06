@@ -14,7 +14,7 @@ construct==2.10.54
     # via pykeepass
 future==0.18.2
     # via pykeepass
-lxml==4.6.5
+lxml==4.9.1
     # via pykeepass
 notify2==0.3.1
     # via -r requirements.in
