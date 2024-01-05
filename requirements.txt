@@ -20,7 +20,7 @@ notify2==0.3.1
     # via -r requirements.in
 pycparser==2.20
     # via cffi
-pycryptodomex==3.10.1
+pycryptodomex==3.19.1
     # via pykeepass
 pykeepass==4.0.1
     # via -r requirements.in
